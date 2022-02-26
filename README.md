@@ -5,7 +5,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/esrrhs/fastremove)](https://goreportcard.com/report/github.com/esrrhs/fastremove)
 [<img src="https://img.shields.io/github/v/release/esrrhs/fastremove">](https://github.com/esrrhs/fastremove/releases)
 [<img src="https://img.shields.io/github/downloads/esrrhs/fastremove/total">](https://github.com/esrrhs/fastremove/releases)
-[<img src="https://img.shields.io/docker/pulls/esrrhs/fastremove">](https://hub.docker.com/repository/docker/esrrhs/fastremove)
 [<img src="https://img.shields.io/github/workflow/status/esrrhs/fastremove/Go">](https://github.com/esrrhs/fastremove/actions)
 
 多线程删除重复文件

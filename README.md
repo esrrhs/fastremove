@@ -2,21 +2,60 @@
 
 [<img src="https://img.shields.io/github/license/esrrhs/fastremove">](https://github.com/esrrhs/fastremove)
 [<img src="https://img.shields.io/github/languages/top/esrrhs/fastremove">](https://github.com/esrrhs/fastremove)
-[![Go Report Card](https://goreportcard.com/badge/github.com/esrrhs/fastremove)](https://goreportcard.com/report/github.com/esrrhs/fastremove)
 [<img src="https://img.shields.io/github/v/release/esrrhs/fastremove">](https://github.com/esrrhs/fastremove/releases)
 [<img src="https://img.shields.io/github/downloads/esrrhs/fastremove/total">](https://github.com/esrrhs/fastremove/releases)
 [<img src="https://img.shields.io/github/actions/workflow/status/esrrhs/fastremove/go.yml?branch=master">](https://github.com/esrrhs/fastremove/actions)
 
-多线程删除重复文件
+> **A fast multithreaded CLI tool that finds and removes duplicate files by MD5.**
 
-# 使用
-* 遍历当前目录及子目录的所有文件，根据MD5移除重复文件
+[English](README.md) | [Chinese](README_CN.md)
+
+---
+
+## Overview
+
+**fastremove** walks a directory tree, hashes each file with MD5, and reports duplicates. With `-delete`, it keeps the first copy and removes the rest.
+
+## Install
+
+Download a prebuilt binary from the **[Releases](https://github.com/esrrhs/fastremove/releases)** page, or build from source:
+
+```bash
+git clone https://github.com/esrrhs/fastremove.git
+cd fastremove
+go build -o fastremove .
 ```
-# ./fastremove -path ./ -method duplicate -delete
+
+Docker:
+
+```bash
+docker build -t fastremove .
 ```
-* 更多参数参考-h
+
+## Usage
+
+Scan the current directory for duplicates (dry run — no deletion):
+
+```bash
+./fastremove -path ./ -method duplicate
 ```
-Usage of fastremove.exe:
+
+Delete duplicate files automatically:
+
+```bash
+./fastremove -path ./ -method duplicate -delete
+```
+
+Show version:
+
+```bash
+./fastremove -version
+```
+
+More flags:
+
+```text
+Usage of ./fastremove:
   -delete
         auto delete
   -method string
@@ -26,4 +65,18 @@ Usage of fastremove.exe:
   -thread int
         replace thread (default 32)
   -v    show info
+  -version
+        show version
 ```
+
+## Build release packages
+
+```bash
+./pack.sh
+```
+
+Cross-platform archives are written to `pack/`. The **Release** workflow watches `version.go`: when its version string changes on `master` (and the tag does not exist yet), CI runs `./pack.sh` and publishes a GitHub Release.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

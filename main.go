@@ -13,101 +13,106 @@ import (
 )
 
 func main() {
-
 	path := flag.String("path", "./", "scan path")
 	method := flag.String("method", "duplicate", "delete method: duplicate")
 	del := flag.Bool("delete", false, "auto delete")
 	thread := flag.Int("thread", 32, "replace thread")
 	v := flag.Bool("v", false, "show info")
+	showVersion := flag.Bool("version", false, "show version")
 
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(Version)
+		return
+	}
 
 	if *path == "" || *method == "" {
 		flag.Usage()
 		return
 	}
 
-	total := 0
-	filepath.Walk(*path, func(path string, info os.FileInfo, err error) error {
+	if *thread < 1 {
+		*thread = 1
+	}
 
-		if info == nil || info.IsDir() {
+	total := 0
+	_ = filepath.Walk(*path, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
 			return nil
 		}
-
 		total++
 		return nil
 	})
 
 	fmt.Printf("total %v\n", total)
 
-	var num int32
-	cur := 0
-	last := 0
-	start := time.Now()
-	filepath.Walk(*path, func(path string, info os.FileInfo, err error) error {
+	var (
+		cur   int32
+		last  int32
+		start = time.Now()
+		sem   = make(chan struct{}, *thread)
+		wg    sync.WaitGroup
+	)
 
-		if info == nil || info.IsDir() {
+	_ = filepath.Walk(*path, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
 			return nil
 		}
 
-		if int(num) < *thread {
-			atomic.AddInt32(&num, 1)
-			go remove(path, &num, *method, *del, *v, &last, &cur, total, start)
-		} else {
-			atomic.AddInt32(&num, 1)
-			remove(path, &num, *method, *del, *v, &last, &cur, total, start)
-		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(path string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			remove(path, *method, *del, *v, &last, &cur, total, start)
+		}(path)
 
 		return nil
 	})
 
-	for num > 0 {
-		time.Sleep(time.Millisecond * 10)
-	}
+	wg.Wait()
 }
 
-var g_duplicate sync.Map
-var g_duplicate_num int
+var (
+	gDuplicate    sync.Map
+	gDuplicateNum int32
+)
 
-func remove_duplicate(f string, del bool, show bool) {
-
+func removeDuplicate(f string, del bool, show bool) {
 	file, err := os.Open(f)
 	if err != nil {
 		panic(err)
 	}
+	defer file.Close()
 
 	hash := md5.New()
-	_, err = io.Copy(hash, file)
-	if err != nil {
+	if _, err = io.Copy(hash, file); err != nil {
 		panic(err)
 	}
-	file.Close()
 
-	m := hash.Sum(nil)
-	mstr := fmt.Sprintf("%x", m)
+	mstr := fmt.Sprintf("%x", hash.Sum(nil))
 	if show {
 		fmt.Printf("done %v %v\n", f, mstr)
 	}
 
-	old, exist := g_duplicate.LoadOrStore(mstr, f)
-	if exist {
-		g_duplicate_num++
-		fmt.Printf("duplicate %v %v %v, total %v\n", f, old.(string), mstr, g_duplicate_num)
-		if del {
-			err := os.Remove(f)
-			if err != nil {
-				panic(err)
-			}
+	old, exist := gDuplicate.LoadOrStore(mstr, f)
+	if !exist {
+		return
+	}
+
+	n := atomic.AddInt32(&gDuplicateNum, 1)
+	fmt.Printf("duplicate %v %v %v, total %v\n", f, old.(string), mstr, n)
+	if del {
+		if err := os.Remove(f); err != nil {
+			panic(err)
 		}
 	}
 }
 
-func remove(f string, num *int32, method string, del bool, show bool, last *int, cur *int, total int, start time.Time) {
-
-	defer atomic.AddInt32(num, -1)
-
+func remove(f string, method string, del bool, show bool, last *int32, cur *int32, total int, start time.Time) {
 	if method == "duplicate" {
-		remove_duplicate(f, del, show)
+		removeDuplicate(f, del, show)
 	} else {
 		panic(fmt.Errorf("no method %v", method))
 	}
@@ -116,14 +121,25 @@ func remove(f string, num *int32, method string, del bool, show bool, last *int,
 	if per <= 0 {
 		per = 1
 	}
-	*cur++
-	step := *cur / per
-	if step != *last {
-		dur := time.Now().Sub(start) / time.Second
-		speed := float64(*cur) / float64(dur)
-		need := float64(total-*cur) / speed
-		*last = step
-		fmt.Printf("complete %v/100, left %vs\n", step, int(need))
+	c := int(atomic.AddInt32(cur, 1))
+	step := int32(c / per)
+
+	for {
+		prev := atomic.LoadInt32(last)
+		if step <= prev {
+			return
+		}
+		if atomic.CompareAndSwapInt32(last, prev, step) {
+			break
+		}
 	}
 
+	dur := time.Since(start).Seconds()
+	if dur <= 0 {
+		fmt.Printf("complete %v/100, left ?s\n", step)
+		return
+	}
+	speed := float64(c) / dur
+	need := float64(total-c) / speed
+	fmt.Printf("complete %v/100, left %vs\n", step, int(need))
 }

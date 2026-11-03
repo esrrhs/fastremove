@@ -14,7 +14,7 @@
 
 ## Overview
 
-**fastremove** walks a directory tree, hashes each file with MD5, and reports duplicates. With `-delete`, it keeps the first copy and removes the rest.
+**fastremove** walks a directory tree, hashes each file with MD5, and reports duplicate groups (which file would be kept vs deleted). **By default it is dry-run only** — nothing is removed unless you pass `-delete`. Use `-keep` to choose which copy survives.
 
 ## Install
 
@@ -34,16 +34,24 @@ docker build -t fastremove .
 
 ## Usage
 
-Scan the current directory for duplicates (dry run — no deletion):
+Scan the current directory for duplicates (dry-run report — no deletion):
 
 ```bash
 ./fastremove -path ./ -method duplicate
 ```
 
-Delete duplicate files automatically:
+Choose which file to keep in each group:
 
 ```bash
-./fastremove -path ./ -method duplicate -delete
+./fastremove -path ./ -method duplicate -keep newest
+./fastremove -path ./ -method duplicate -keep shortest-path
+```
+
+Write the report to a file, then delete non-keepers:
+
+```bash
+./fastremove -path ./ -method duplicate -report dups.txt
+./fastremove -path ./ -method duplicate -keep newest -delete
 ```
 
 Show version:
@@ -57,17 +65,27 @@ More flags:
 ```text
 Usage of ./fastremove:
   -delete
-        auto delete
+        actually delete duplicate files (default: dry-run report only)
+  -keep string
+        keep strategy: first, newest, shortest-path (default "first")
   -method string
         delete method: duplicate (default "duplicate")
   -path string
         scan path (default "./")
+  -report string
+        optional path to write duplicate report (default: stdout)
   -thread int
-        replace thread (default 32)
+        hash worker concurrency (default 32)
   -v    show info
   -version
         show version
 ```
+
+Keep strategies:
+
+- `first` (default): keep the first file seen in walk order
+- `newest`: keep the file with the newest modification time
+- `shortest-path`: keep the path with the fewest separators (then shorter string, then lexical)
 
 ## Build release packages
 

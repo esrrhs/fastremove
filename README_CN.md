@@ -14,7 +14,7 @@
 
 ## 简介
 
-**fastremove** 递归遍历目录，用 MD5 哈希识别重复文件并报告。加上 `-delete` 时，保留首次出现的副本，删除其余重复项。
+**fastremove** 递归遍历目录，用 MD5 哈希识别重复文件，并报告每组中保留哪个、删除哪些。**默认仅为 dry-run（只报告，不删除）**；加上 `-delete` 才会真正删除。可用 `-keep` 选择保留策略。
 
 ## 安装
 
@@ -40,10 +40,18 @@ docker build -t fastremove .
 ./fastremove -path ./ -method duplicate
 ```
 
-自动删除重复文件：
+选择每组保留哪一份：
 
 ```bash
-./fastremove -path ./ -method duplicate -delete
+./fastremove -path ./ -method duplicate -keep newest
+./fastremove -path ./ -method duplicate -keep shortest-path
+```
+
+将报告写入文件，再删除非保留项：
+
+```bash
+./fastremove -path ./ -method duplicate -report dups.txt
+./fastremove -path ./ -method duplicate -keep newest -delete
 ```
 
 查看版本：
@@ -57,17 +65,27 @@ docker build -t fastremove .
 ```text
 Usage of ./fastremove:
   -delete
-        auto delete
+        真正删除重复文件（默认仅 dry-run 报告）
+  -keep string
+        保留策略：first、newest、shortest-path（默认 "first"）
   -method string
-        delete method: duplicate (default "duplicate")
+        删除方法：duplicate（默认 "duplicate"）
   -path string
-        scan path (default "./")
+        扫描路径（默认 "./"）
+  -report string
+        可选，将重复报告写入该路径（默认 stdout）
   -thread int
-        replace thread (default 32)
-  -v    show info
+        哈希并发数（默认 32）
+  -v    显示详细信息
   -version
-        show version
+        显示版本
 ```
+
+保留策略：
+
+- `first`（默认）：按遍历顺序保留最先看到的文件
+- `newest`：保留修改时间最新的文件
+- `shortest-path`：保留路径分隔符最少的（其次更短字符串，再按字典序）
 
 ## 打包发布
 

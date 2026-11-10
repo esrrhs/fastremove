@@ -25,7 +25,6 @@ func TestDryRunDoesNotDelete(t *testing.T) {
 		t.Fatalf("remove candidates = %d, want 1", len(groups[0].remove))
 	}
 
-	// Simulate dry-run: do not call deleteDuplicates
 	if _, err := os.Stat(a); err != nil {
 		t.Fatalf("a should remain: %v", err)
 	}
@@ -49,12 +48,13 @@ func TestDeleteRemovesOnlyNonKeepers(t *testing.T) {
 		t.Fatalf("groups = %d, want 1", len(groups))
 	}
 
-	deleted, failed := deleteDuplicates(groups)
-	if failed != 0 {
-		t.Fatalf("failed deletes = %d", failed)
+	cfg := testRemoveCfg(t)
+	stats := processRemovals(groups, cfg)
+	if stats.Failed != 0 {
+		t.Fatalf("failed = %d, results=%v", stats.Failed, stats.Results)
 	}
-	if deleted != 1 {
-		t.Fatalf("deleted = %d, want 1", deleted)
+	if stats.Quarantined != 1 {
+		t.Fatalf("quarantined = %d, want 1 (stats=%+v)", stats.Quarantined, stats)
 	}
 
 	keepPath := groups[0].keep.path
@@ -63,7 +63,7 @@ func TestDeleteRemovesOnlyNonKeepers(t *testing.T) {
 		t.Fatalf("keeper %s should remain: %v", keepPath, err)
 	}
 	if _, err := os.Stat(removePath); !os.IsNotExist(err) {
-		t.Fatalf("non-keeper %s should be deleted, err=%v", removePath, err)
+		t.Fatalf("non-keeper %s should be removed, err=%v", removePath, err)
 	}
 }
 
@@ -178,7 +178,6 @@ func TestPickKeeperStrategiesUnit(t *testing.T) {
 		t.Fatalf("shortest-path keep = %s, want /z.txt", members[idx].path)
 	}
 
-	// Equal separator count: prefer shorter string, then lexical
 	tied := []fileMeta{
 		{path: "/bb.txt", order: 0, modTime: now},
 		{path: "/aa.txt", order: 1, modTime: now},
@@ -196,7 +195,18 @@ func TestVersionNotEmpty(t *testing.T) {
 
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func testRemoveCfg(t *testing.T) *removeConfig {
+	t.Helper()
+	return &removeConfig{
+		Trash:         unsupportedTrash{},
+		QuarantineDir: filepath.Join(t.TempDir(), "quarantine"),
 	}
 }
